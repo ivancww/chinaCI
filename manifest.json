@@ -1,0 +1,22 @@
+{
+  "name": "生活应急保险库",
+  "short_name": "应急保",
+  "description": "专为高净值家庭定制的生活应急保险与理赔沙盘推演。",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2c3e50",
+  "icons": [
+    {
+      "src": "logo-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
