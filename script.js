@@ -1,4 +1,4 @@
-/* * 生活应急保险库 v2.6 - 核心逻辑 (私域 CRM 升级版) */
+/* * 生活应急保险库 v2.7 - 核心逻辑 (私域 CRM 版) */
 
 let state = {
   mode: 'adult',
@@ -103,7 +103,12 @@ function initDashboard() {
   document.getElementById('cancerCashAmountTxt').innerText = `每月金额: ${formatMoney(cancerMonthly)}`;
 
   document.getElementById('dispAge').innerText = state.currentAge + " 岁";
-  document.getElementById('dispTotalClaim').innerText = formatMoney(0);
+  
+  // 初始化时重置动画并归零
+  const claimEl = document.getElementById('dispTotalClaim');
+  claimEl.innerText = formatMoney(0);
+  claimEl.classList.remove('flash-text');
+  
   document.getElementById('dispPayStatus').innerText = "正常缴费";
   document.getElementById('heartStrokeCountTxt').innerText = "(0/3次)";
   
@@ -226,9 +231,17 @@ function triggerWaiver(who) {
   document.getElementById('insightText').innerHTML = insight;
 }
 
+// 核心更新：加入 5 秒闪烁动画重绘机制
 function updateUI() {
   document.getElementById('dispAge').innerText = state.currentAge + " 岁";
-  document.getElementById('dispTotalClaim').innerText = formatMoney(state.totalClaimed);
+  
+  const claimEl = document.getElementById('dispTotalClaim');
+  claimEl.innerText = formatMoney(state.totalClaimed);
+  
+  // 移除动画类 -> 触发重绘 -> 添加动画类 (确保每次点击都会闪烁 5 秒)
+  claimEl.classList.remove('flash-text');
+  void claimEl.offsetWidth; // Trigger DOM reflow
+  claimEl.classList.add('flash-text');
 }
 
 // --- 导航列与弹窗控制逻辑 ---
@@ -319,7 +332,6 @@ function loadSelectedClient() {
     document.getElementById('startAge').value = client.age;
     state.sumWhole = client.sumWhole;
     
-    // 切换货币但不触发 initDashboard (避免覆盖其他设定)
     document.getElementById('currencySelect').value = client.currency || 'USD';
     state.currency = client.currency || 'USD';
     if (state.currency === 'CNY') {
@@ -330,7 +342,6 @@ function loadSelectedClient() {
     let displayVal = state.sumWhole * (state.currency === 'CNY' ? state.exchangeRate : 1);
     document.getElementById('sumWhole').value = Math.round(displayVal).toLocaleString('en-US');
 
-    // 切换模式并触发最终的渲染
     setMode(client.mode || 'adult');
     initDashboard();
   }
@@ -421,12 +432,10 @@ function checkSharedMode() {
     document.getElementById('currencySelect').value = curr;
     
     const mode = params.get('m') || 'adult';
-    // 强制更新显示并渲染
     changeCurrency(); 
     setMode(mode);
     initDashboard();
   } else {
-    // 顾问正常模式
     updateClientDropdown();
     setMode('adult');
   }
