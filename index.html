@@ -2,9 +2,18 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>生活应急保险库 v2.7 (私域 CRM 版)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>生活应急保险库 v2.8 (私域 CRM 版)</title>
 
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2c3e50">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="生活应急保">
+
+<link rel="apple-touch-icon" href="logo-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="logo-512.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <style>
@@ -19,7 +28,6 @@
   body.shared-mode .bottom-nav { display: none !important; }
   body.shared-mode .client-manager-box { display: none !important; }
 
-  /* 修复：移除 overflow: hidden，让右侧面板可以悬浮吸顶 */
   .container { max-width: 1200px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
   .header { background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); color: white; padding: 20px; text-align: center; border-radius: 12px 12px 0 0; border-bottom: 4px solid var(--gold); position: relative;}
   .header h1 { margin: 0; font-size: 1.8rem; font-weight: 900; letter-spacing: 1px;}
@@ -31,16 +39,16 @@
   
   .config-panel { background: #f8f9fa; padding: 20px; border-right: 1px solid #eee; border-radius: 0 0 0 12px; }
   
-  /* 修复：右侧面板完美悬浮跟随 */
+  /* 右侧面板完美悬浮跟随 */
   .analysis-panel { 
     background: #fff; 
     padding: 20px; 
     position: sticky; 
-    top: 20px; /* 距离顶部 20px */
-    max-height: calc(100vh - 40px); /* 确保高度自适应，内部可滚动 */
+    top: 20px; 
+    max-height: calc(100vh - 40px); 
     overflow-y: auto; 
     border-radius: 0 0 12px 0; 
-    box-shadow: -5px 0 15px rgba(0,0,0,0.02); /* 增加微阴影提升立体感 */
+    box-shadow: -5px 0 15px rgba(0,0,0,0.02); 
   }
 
   /* 手机端取消悬浮，改为正常堆叠 */
@@ -99,7 +107,7 @@
   @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(39, 174, 96, 0); } 100% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); } }
   .waiver-active { animation: pulse-green 2s infinite; border: 2px solid #27ae60 !important; }
   
-  /* 新增：理赔金额闪烁特效 (5秒) */
+  /* 理赔金额闪烁特效 (5秒) */
   @keyframes flash-amount {
     0% { color: #27ae60; transform: scale(1.1); text-shadow: 0 0 10px rgba(39, 174, 96, 0.5); }
     10% { color: #e74c3c; transform: scale(1.2); text-shadow: 0 0 15px rgba(231, 76, 60, 0.8); }
@@ -145,8 +153,8 @@
   <div class="header">
     <h1>🛡️ 家庭生活应急保险库</h1>
     <div class="version-tag" id="appVersion">
-      v2.7 私域 CRM 版<br>
-      <span style="font-size:0.65rem; color:#fdfbf7; font-weight:normal;">优化：右侧悬浮吸顶与闪烁特效</span>
+      v2.8 私域 CRM 版<br>
+      <span style="font-size:0.65rem; color:#fdfbf7; font-weight:normal;">修复：补回 App Logo 及 PWA 支持</span>
     </div>
   </div>
 
@@ -372,6 +380,18 @@
     </div>
   </div>
 </div>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').then(registration => {
+        console.log('SW registered: ', registration);
+      }).catch(registrationError => {
+        console.log('SW registration failed: ', registrationError);
+      });
+    });
+  }
+</script>
 
 <script src="script.js"></script>
 </body>
