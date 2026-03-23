@@ -1,38 +1,43 @@
-/** 生活应急保险库 v2.7 - 核心逻辑 **/
+/* 生活应急保险库 v2.8 - 核心逻辑 */
 
 let state = {
-  mode: 'adult',
-  startAge: 30,
-  currentAge: 30,
-  sumWhole: 1000000,
-  totalClaimed: 0,
-  isFirstClaimed: false,
-  currency: 'USD',
-  exchangeRate: 7.2,
-  waiverActive: false
+  mode: 'adult', startAge: 30, currentAge: 30, sumWhole: 1000000,
+  totalClaimed: 0, isFirstClaimed: false, currency: 'USD', exchangeRate: 7.2
 };
 
-// --- 初始化與基礎功能 ---
-async function fetchExchangeRate() {
-  try {
-    let res = await fetch('https://open.er-api.com/v6/latest/USD');
-    let data = await res.json();
-    state.exchangeRate = data.rates.CNY || 7.2;
-  } catch(e) { console.log("使用預設匯率"); }
+// --- 初始化與 PWA 檢查 ---
+window.onload = () => {
+  const params = new URLSearchParams(window.location.search);
+  if(params.get('shared') === '1') {
+    document.body.classList.add('shared-mode');
+    const name = decodeURIComponent(params.get('n') || '貴賓');
+    document.getElementById('vipBanner').innerHTML = `🌟 尊貴的 ${name}，這是為您定制的防御矩陣`;
+    document.getElementById('vipBanner').style.display = 'block';
+    
+    // 加載分享數據
+    document.getElementById('startAge').value = params.get('a') || 30;
+    document.getElementById('sumWhole').value = Number(params.get('s') || 1000000).toLocaleString();
+    state.mode = params.get('m') || 'adult';
+    state.currency = params.get('c') || 'USD';
+    setMode(state.mode);
+    initDashboard();
+  } else {
+    updateClientDropdown();
+  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+};
+
+function forceUpdateApp() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(r => r.update());
+      alert("🚀 更新已發送！請關閉 App 並重新開啟以完成 v2.8 升級。");
+      location.reload(true);
+    });
+  }
 }
 
-function formatMoneyInput(el) {
-  let val = el.value.replace(/,/g, '').replace(/[^\d]/g, '');
-  if(val) el.value = Number(val).toLocaleString();
-}
-
-function formatCurrency(amt) {
-  let displayAmt = state.currency === 'CNY' ? amt * state.exchangeRate : amt;
-  let symbol = state.currency === 'CNY' ? '¥' : '$';
-  return symbol + Math.round(displayAmt).toLocaleString();
-}
-
-// --- 業務邏輯 ---
+// --- 理賠推演邏輯 ---
 function setMode(m) {
   state.mode = m;
   document.getElementById('btnAdultMode').classList.toggle('active', m === 'adult');
@@ -45,20 +50,18 @@ function initDashboard() {
   state.startAge = parseInt(document.getElementById('startAge').value);
   state.currentAge = state.startAge;
   let rawSum = document.getElementById('sumWhole').value.replace(/,/g, '');
-  state.sumWhole = state.currency === 'CNY' ? rawSum / state.exchangeRate : rawSum;
+  state.sumWhole = parseFloat(rawSum);
   state.totalClaimed = 0;
   state.isFirstClaimed = false;
-  state.waiverActive = false;
-  
   document.getElementById('logList').innerHTML = "";
   updateUI();
-  addLog("🛡️ 保单生效", formatCurrency(state.sumWhole));
+  addLog("🛡️ 保單生效", formatCurrency(state.sumWhole));
 }
 
 function triggerFirstClaim() {
   if(state.isFirstClaimed) return;
   state.isFirstClaimed = true;
-  state.totalClaimed += parseFloat(state.sumWhole);
+  state.totalClaimed += state.sumWhole;
   state.currentAge += 2;
   addLog("🚨 首次重疾理賠", formatCurrency(state.sumWhole));
   updateUI();
@@ -68,28 +71,32 @@ function triggerEarlyStage() {
   let amt = state.sumWhole * 0.2;
   state.totalClaimed += amt;
   state.currentAge += 1;
-  addLog("🩺 轻疾理赔", formatCurrency(amt));
+  addLog("🩺 輕疾理賠", formatCurrency(amt));
   updateUI();
 }
 
 function triggerCancerLump() {
-  if(!state.isFirstClaimed) return alert("請先觸發首次重疾");
-  state.totalClaimed += parseFloat(state.sumWhole);
+  if(!state.isFirstClaimed) return alert("請先啟動首次重疾");
+  state.totalClaimed += state.sumWhole;
   state.currentAge += 3;
-  addLog("🧬 癌症復發提款", formatCurrency(state.sumWhole));
+  addLog("🧬 癌症復發賠償", formatCurrency(state.sumWhole));
   updateUI();
 }
 
-function triggerWaiver(type) {
-  state.waiverActive = true;
-  document.getElementById('dispPayStatus').innerText = "保费豁免";
+function triggerWaiver() {
+  document.getElementById('dispPayStatus').innerText = "保費豁免";
   document.getElementById('waiverStatusBar').style.border = "2px solid #27ae60";
   addLog("⚠️ 觸發豁免", "未來保費 $0");
 }
 
+// --- 輔助功能 ---
+function formatCurrency(amt) {
+  return (state.currency === 'CNY' ? '¥' : '$') + Math.round(amt).toLocaleString();
+}
+
 function addLog(evt, amt) {
   const li = document.createElement('li');
-  li.innerHTML = `<span>[${state.currentAge}岁] ${evt}</span> <strong>${amt}</strong>`;
+  li.innerHTML = `<span>[${state.currentAge}歲] ${evt}</span> <strong>${amt}</strong>`;
   document.getElementById('logList').prepend(li);
 }
 
@@ -98,11 +105,14 @@ function updateUI() {
   document.getElementById('dispTotalClaim').innerText = formatCurrency(state.totalClaimed);
 }
 
-// --- 圖片縮放與彈窗 ---
+function formatMoneyInput(el) {
+  let val = el.value.replace(/,/g, '').replace(/[^\d]/g, '');
+  if(val) el.value = Number(val).toLocaleString();
+}
+
 function zoomImg(src) {
-  const overlay = document.getElementById('zoomOverlay');
   document.getElementById('zoomedImg').src = src;
-  overlay.style.display = 'flex';
+  document.getElementById('zoomOverlay').style.display = 'flex';
 }
 
 function showModal(id) {
@@ -114,58 +124,38 @@ function closeAllModals() {
   document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none');
 }
 
-// --- 強制更新功能 ---
-function forceUpdateApp() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(registrations => {
-      for (let registration of registrations) {
-        registration.update();
-      }
-      alert("🚀 更新指令已發送！請關閉 App 並重新開啟以加載最新版本。");
-      location.reload(true);
-    });
-  } else {
-    location.reload(true);
-  }
+// --- 分享與存檔 ---
+function generateShareQR() {
+  const name = document.getElementById('clientNameInput').value || '貴賓';
+  const url = `${window.location.origin}${window.location.pathname}?shared=1&n=${encodeURIComponent(name)}&a=${state.startAge}&s=${state.sumWhole}&m=${state.mode}&c=${state.currency}`;
+  document.getElementById('qrcode').innerHTML = "";
+  new QRCode(document.getElementById('qrcode'), { text: url, width: 200, height: 200 });
+  showModal('qrModal');
 }
 
-// --- CRM 檔案管理 ---
 function saveClientData() {
   let name = document.getElementById('clientNameInput').value;
-  if(!name) return alert("請輸入客戶名");
-  let data = { name, age: state.startAge, sum: state.sumWhole, mode: state.mode };
-  let list = JSON.parse(localStorage.getItem('tot_clients') || "[]");
-  list.push(data);
-  localStorage.setItem('tot_clients', JSON.stringify(list));
+  if(!name) return alert("請輸入方案名");
+  let list = JSON.parse(localStorage.getItem('tot_v2') || "[]");
+  list.push({ name, a: state.startAge, s: state.sumWhole, m: state.mode });
+  localStorage.setItem('tot_v2', JSON.stringify(list));
   updateClientDropdown();
   alert("保存成功");
 }
 
 function updateClientDropdown() {
-  let list = JSON.parse(localStorage.getItem('tot_clients') || "[]");
+  let list = JSON.parse(localStorage.getItem('tot_v2') || "[]");
   let sel = document.getElementById('clientSelect');
-  sel.innerHTML = '<option value="">-- 选择已保存客户 --</option>';
-  list.forEach((item, idx) => {
-    let opt = document.createElement('option');
-    opt.value = idx;
-    opt.text = item.name;
-    sel.appendChild(opt);
-  });
+  sel.innerHTML = '<option value="">-- 選擇客戶 --</option>';
+  list.forEach((c, i) => sel.add(new Option(c.name, i)));
 }
 
-function generateShareQR() {
-  const shareUrl = window.location.href + "?shared=1&n=" + encodeURIComponent(document.getElementById('clientNameInput').value);
-  const qrContainer = document.getElementById('qrcode-source');
-  qrContainer.innerHTML = '';
-  new QRCode(qrContainer, { text: shareUrl, width: 200, height: 200 });
-  setTimeout(() => {
-    const canvas = qrContainer.querySelector('canvas');
-    document.getElementById('final-qr-img').src = canvas.toDataURL("image/png");
-    showModal('shareQRModal');
-  }, 300);
+function loadSelectedClient() {
+  let idx = document.getElementById('clientSelect').value;
+  if(idx === "") return;
+  let c = JSON.parse(localStorage.getItem('tot_v2'))[idx];
+  document.getElementById('clientNameInput').value = c.name;
+  document.getElementById('startAge').value = c.a;
+  document.getElementById('sumWhole').value = c.s.toLocaleString();
+  setMode(c.m);
 }
-
-window.onload = () => {
-  fetchExchangeRate();
-  updateClientDropdown();
-};
