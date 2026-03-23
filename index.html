@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>生活应急保险库 v2.10 (私域 CRM 互动版)</title>
+<title>生活应急保险库 v2.11 (私域 CRM 互动版)</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2c3e50">
@@ -24,7 +24,6 @@
   }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #ecf0f1; color: #333; margin: 0; padding: 20px; padding-bottom: 90px; transition: padding 0.3s; }
   
-  /* 客户分享模式下：隐藏底部导航、CRM客户管理区、模式切换按钮。但【保留基础配置区】！ */
   body.shared-mode { padding-bottom: 20px; }
   body.shared-mode .bottom-nav { display: none !important; }
   body.shared-mode .client-manager-box { display: none !important; }
@@ -147,44 +146,45 @@
   <div class="header">
     <h1>🛡️ 家庭生活应急保险库</h1>
     <div class="version-tag" id="appVersion">
-      v2.10 高客互动版<br>
-      <span style="font-size:0.65rem; color:#fdfbf7; font-weight:normal;">更新：客户页面开放保额/汇率调校</span>
+      v2.11 强更旗舰版<br>
+      <span style="font-size:0.65rem; color:#fdfbf7; font-weight:normal;">新增：离线应用自动更新机制</span>
     </div>
   </div>
 
   <div class="main-grid">
     <div class="config-panel">
       
-      <div class="client-manager-box">
-        <div class="section-title" style="margin-top: 0; color:#2980b9;">👤 专属客户档案库</div>
-        
-        <div class="input-group" style="margin-bottom: 8px;">
-          <label>读取档案</label>
-          <select id="clientSelect" onchange="loadSelectedClient()" style="background:#fff;">
-            <option value="">-- 选择已保存客户 --</option>
-          </select>
+      <div id="agentOnlyArea">
+        <div class="client-manager-box">
+          <div class="section-title" style="margin-top: 0; color:#2980b9;">👤 专属客户档案库</div>
+          
+          <div class="input-group" style="margin-bottom: 8px;">
+            <label>读取档案</label>
+            <select id="clientSelect" onchange="loadSelectedClient()" style="background:#fff;">
+              <option value="">-- 选择已保存客户 --</option>
+            </select>
+          </div>
+
+          <div class="input-group" style="margin-bottom: 5px;">
+            <label>客户/方案名</label>
+            <input type="text" id="clientNameInput" placeholder="如: 王总方案A" style="text-align: left; background:#fff;">
+          </div>
+
+          <div class="client-actions">
+            <button class="btn-sm bg-save" onclick="saveClientData()">💾 保存当前</button>
+            <button class="btn-sm bg-del" onclick="deleteClientData()">🗑️ 删除</button>
+            <button class="btn-sm bg-export" onclick="exportClientData()">📤 导出</button>
+            <button class="btn-sm bg-import" onclick="document.getElementById('importFile').click()">📥 导入</button>
+            <input type="file" id="importFile" style="display:none" accept=".json" onchange="importClientData(event)">
+          </div>
+          <button class="btn-sm bg-share" onclick="generateShareQR()">📲 生成专属沙盘二维码</button>
         </div>
 
-        <div class="input-group" style="margin-bottom: 5px;">
-          <label>客户/方案名</label>
-          <input type="text" id="clientNameInput" placeholder="如: 王总方案A" style="text-align: left; background:#fff;">
+        <div class="mode-switch-container">
+          <button class="mode-btn active" id="btnAdultMode" onclick="setMode('adult')">👨‍💼 顶梁柱模式</button>
+          <button class="mode-btn" id="btnChildMode" onclick="setMode('child')">👶 吞金兽模式</button>
         </div>
-
-        <div class="client-actions">
-          <button class="btn-sm bg-save" onclick="saveClientData()">💾 保存当前</button>
-          <button class="btn-sm bg-del" onclick="deleteClientData()">🗑️ 删除</button>
-          <button class="btn-sm bg-export" onclick="exportClientData()">📤 导出</button>
-          <button class="btn-sm bg-import" onclick="document.getElementById('importFile').click()">📥 导入</button>
-          <input type="file" id="importFile" style="display:none" accept=".json" onchange="importClientData(event)">
-        </div>
-        <button class="btn-sm bg-share" onclick="generateShareQR()">📲 生成专属沙盘二维码</button>
       </div>
-
-      <div class="mode-switch-container">
-        <button class="mode-btn active" id="btnAdultMode" onclick="setMode('adult')">👨‍💼 顶梁柱模式</button>
-        <button class="mode-btn" id="btnChildMode" onclick="setMode('child')">👶 吞金兽模式</button>
-      </div>
-
       <div class="section-title">💼 基础配置</div>
       <div class="input-group">
         <label>显示货币</label>
@@ -206,6 +206,7 @@
         <input type="text" id="sumWhole" value="1,000,000" onkeyup="formatMoneyInput(this)">
       </div>
       <button class="btn-dark" onclick="initDashboard()" style="margin-top: 10px;">✅ 生成专属沙盘</button>
+
       <div id="bonusBanner" class="bonus-banner"></div>
 
       <div class="section-title" style="margin-top: 25px; color:#c0392b;">🎯 实战理赔推演区</div>
@@ -379,8 +380,28 @@
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js').then(registration => {
         console.log('SW registered: ', registration);
-      }).catch(registrationError => {
-        console.log('SW registration failed: ', registrationError);
+        
+        // 监听后台是否拉取到新版本的 sw.js
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {
+            // 当新版本安装完成且准备接管时
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              console.log('发现新版本，准备强制更新...');
+            }
+          });
+        });
+      }).catch(error => {
+        console.log('SW registration failed: ', error);
+      });
+
+      // 当 Service Worker 成功夺取控制权（即跳过等待后），强制刷新客户端页面
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          window.location.reload();
+          refreshing = true;
+        }
       });
     });
   }
