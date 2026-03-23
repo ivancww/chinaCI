@@ -1,4 +1,4 @@
-/* * Service Worker 腳本 (v2.8 私域 CRM 旗艦版) */
+/* * Service Worker 腳本 (v2.8.1 私域 CRM 旗艦版) */
 
 const CACHE_NAME = 'tot-vault-v2.8'; // 更新版本號以強制刷新快取
 
