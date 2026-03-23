@@ -1,4 +1,4 @@
-/* 生活应急保险库 v2.8 - 核心逻辑 */
+/* 生活应急保险库 v2.8.1 - 核心逻辑 */
 
 let state = {
   mode: 'adult', startAge: 30, currentAge: 30, sumWhole: 1000000,
