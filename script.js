@@ -1,448 +1,171 @@
-/* * 生活应急保险库 v2.7 - 核心逻辑 (私域 CRM 版) */
+/** 生活应急保险库 v2.7 - 核心逻辑 **/
 
 let state = {
   mode: 'adult',
   startAge: 30,
   currentAge: 30,
-  sumWhole: 1000000, 
-  upgradeBonus: 0, 
+  sumWhole: 1000000,
   totalClaimed: 0,
-  cancerMonths: 0,
-  heartStrokeCount: 0,
   isFirstClaimed: false,
-  waiverActive: false,
   currency: 'USD',
-  exchangeRate: 1
+  exchangeRate: 7.2,
+  waiverActive: false
 };
 
-// --- 0. 实时汇率获取 ---
+// --- 初始化與基礎功能 ---
 async function fetchExchangeRate() {
   try {
     let res = await fetch('https://open.er-api.com/v6/latest/USD');
     let data = await res.json();
-    if (data && data.rates && data.rates.CNY) {
-      state.exchangeRate = data.rates.CNY;
-      document.getElementById('exchangeRateVal').innerText = state.exchangeRate.toFixed(4);
-    }
-  } catch (error) {
-    console.error("Fetch API failed, using fallback exchange rate.");
-    state.exchangeRate = 7.15; 
-    document.getElementById('exchangeRateVal').innerText = "7.1500 (离线预设)";
-  }
+    state.exchangeRate = data.rates.CNY || 7.2;
+  } catch(e) { console.log("使用預設匯率"); }
 }
 
-function changeCurrency() {
-  state.currency = document.getElementById('currencySelect').value;
-  if (state.currency === 'CNY') {
-    document.getElementById('rateDisplay').style.display = 'block';
-  } else {
-    document.getElementById('rateDisplay').style.display = 'none';
-  }
-  let displayVal = state.sumWhole * (state.currency === 'CNY' ? state.exchangeRate : 1);
-  document.getElementById('sumWhole').value = Math.round(displayVal).toLocaleString('en-US');
-  initDashboard(); 
+function formatMoneyInput(el) {
+  let val = el.value.replace(/,/g, '').replace(/[^\d]/g, '');
+  if(val) el.value = Number(val).toLocaleString();
 }
 
-function formatMoneyInput(input) {
-  let v = input.value.replace(/,/g, '').replace(/[^\d]/g, '');
-  if(v) {
-    input.value = Number(v).toLocaleString('en-US');
-    let rawVal = Number(v);
-    state.sumWhole = state.currency === 'CNY' ? (rawVal / state.exchangeRate) : rawVal;
-  }
+function formatCurrency(amt) {
+  let displayAmt = state.currency === 'CNY' ? amt * state.exchangeRate : amt;
+  let symbol = state.currency === 'CNY' ? '¥' : '$';
+  return symbol + Math.round(displayAmt).toLocaleString();
 }
 
-function formatMoney(usdAmount) {
-  let converted = usdAmount * (state.currency === 'CNY' ? state.exchangeRate : 1);
-  let sym = state.currency === 'CNY' ? '¥' : '$';
-  return sym + converted.toLocaleString('en-US', {maximumFractionDigits: 0});
-}
-
-function addLog(age, event, amountStr, badgeLabel = '') {
-  const ul = document.getElementById('logList');
-  const li = document.createElement('li');
-  let badge = badgeLabel ? `<span class="log-badge">${badgeLabel}</span> ` : '';
-  li.innerHTML = `<span>[${age}岁] ${badge}${event}</span> <span style="color:#2ecc71; font-weight:bold;">${amountStr}</span>`;
-  ul.prepend(li);
-}
-
-function setMode(selectedMode) {
-  state.mode = selectedMode;
-  document.getElementById('btnAdultMode').className = selectedMode === 'adult' ? 'mode-btn active' : 'mode-btn';
-  document.getElementById('btnChildMode').className = selectedMode === 'child' ? 'mode-btn active' : 'mode-btn';
-  
-  document.getElementById('adultControls').style.display = selectedMode === 'adult' ? 'block' : 'none';
-  document.getElementById('childControls').style.display = selectedMode === 'child' ? 'block' : 'none';
-  document.getElementById('dementiaControlCard').style.display = selectedMode === 'child' ? 'block' : 'none';
-
-  document.getElementById('startAge').value = selectedMode === 'adult' ? 30 : 0;
-  
-  let insight = selectedMode === 'adult' 
-    ? "👨‍💼 <b>顶梁柱模式启动：</b>专注大病收入补偿。重点演示“抗癌月薪”及“配偶豁免”。"
-    : "👶 <b>吞金兽模式启动：</b>专注爱与传承。重点演示“脑退化年金”、“ADHD特教金”及“父母双豁免”。";
-  document.getElementById('insightText').innerHTML = insight;
+// --- 業務邏輯 ---
+function setMode(m) {
+  state.mode = m;
+  document.getElementById('btnAdultMode').classList.toggle('active', m === 'adult');
+  document.getElementById('btnChildMode').classList.toggle('active', m === 'child');
+  document.getElementById('adultControls').style.display = m === 'adult' ? 'block' : 'none';
+  document.getElementById('childControls').style.display = m === 'child' ? 'block' : 'none';
 }
 
 function initDashboard() {
   state.startAge = parseInt(document.getElementById('startAge').value);
   state.currentAge = state.startAge;
+  let rawSum = document.getElementById('sumWhole').value.replace(/,/g, '');
+  state.sumWhole = state.currency === 'CNY' ? rawSum / state.exchangeRate : rawSum;
   state.totalClaimed = 0;
-  state.cancerMonths = 0;
-  state.heartStrokeCount = 0;
   state.isFirstClaimed = false;
   state.waiverActive = false;
-
-  let bonusRate = state.startAge <= 30 ? 0.50 : 0.35;
-  state.upgradeBonus = state.sumWhole * bonusRate;
   
-  let banner = document.getElementById('bonusBanner');
-  banner.style.display = 'block';
-  banner.innerHTML = `🎁 尊享首10年升级保障：免费送 ${bonusRate * 100}% 保额 (+${formatMoney(state.upgradeBonus)})`;
-
-  let cancerMonthly = state.sumWhole * 0.05;
-  document.getElementById('cancerCashAmountTxt').innerText = `每月金额: ${formatMoney(cancerMonthly)}`;
-
-  document.getElementById('dispAge').innerText = state.currentAge + " 岁";
-  
-  // 初始化时重置动画并归零
-  const claimEl = document.getElementById('dispTotalClaim');
-  claimEl.innerText = formatMoney(0);
-  claimEl.classList.remove('flash-text');
-  
-  document.getElementById('dispPayStatus').innerText = "正常缴费";
-  document.getElementById('heartStrokeCountTxt').innerText = "(0/3次)";
-  
-  document.getElementById('waiverStatusBar').classList.remove('waiver-active');
-  document.getElementById('btnFirstClaim').disabled = false;
-  document.getElementById('btnEarlyStage').disabled = false;
-  document.getElementById('btnCancerLump').disabled = false;
-  document.getElementById('btnCancerCash').disabled = false;
-  document.getElementById('btnHeartStroke').disabled = false;
   document.getElementById('logList').innerHTML = "";
-  
-  addLog(state.currentAge, "🛡️ 保单正式生效", `重疾险保额 ${formatMoney(state.sumWhole)}`);
-}
-
-// --- 业务理赔逻辑 ---
-function triggerEarlyStage() {
-  state.currentAge += 1;
-  let rawAmt = state.sumWhole * 0.20;
-  let earlyAmt = Math.min(rawAmt, 50000); 
-  
-  state.totalClaimed += earlyAmt;
   updateUI();
-  addLog(state.currentAge, "🩺 轻疾理赔 (含44种)", `+${formatMoney(earlyAmt)}`, "早赔早治");
-  document.getElementById('insightText').innerHTML = "<b>TOT 解析：</b>轻疾理赔 20%（上限5万美元）。不用等拖成重症，发现早期病征直接拿钱治病！";
+  addLog("🛡️ 保单生效", formatCurrency(state.sumWhole));
 }
 
 function triggerFirstClaim() {
-  if(state.isFirstClaimed) return alert("首次重疾已被激活！");
-  state.currentAge += 2; 
+  if(state.isFirstClaimed) return;
   state.isFirstClaimed = true;
-  
-  let totalPay = state.sumWhole;
-  let logTxt = "🚨 首次重疾确诊 (含58种)";
-  
-  if ((state.currentAge - state.startAge) < 10) {
-    totalPay += state.upgradeBonus;
-    logTxt = `🚨 首次重疾 (100% + 升级保障)`;
-  }
-  
-  state.totalClaimed += totalPay;
-  
-  document.getElementById('btnFirstClaim').disabled = true;
+  state.totalClaimed += parseFloat(state.sumWhole);
+  state.currentAge += 2;
+  addLog("🚨 首次重疾理賠", formatCurrency(state.sumWhole));
   updateUI();
-  addLog(state.currentAge, logTxt, `+${formatMoney(totalPay)}`, "底盘防御");
-  document.getElementById('insightText').innerHTML = "<b>TOT 解析：</b>首次重疾理赔完成！如果在首10年内，触发额外的免费赠送保额！接下来，10X多重危疾防御网正式启动。";
+}
+
+function triggerEarlyStage() {
+  let amt = state.sumWhole * 0.2;
+  state.totalClaimed += amt;
+  state.currentAge += 1;
+  addLog("🩺 轻疾理赔", formatCurrency(amt));
+  updateUI();
 }
 
 function triggerCancerLump() {
-  if(!state.isFirstClaimed) return alert("请先启动首次重疾！");
-  state.currentAge += 3; 
-  state.totalClaimed += state.sumWhole;
+  if(!state.isFirstClaimed) return alert("請先觸發首次重疾");
+  state.totalClaimed += parseFloat(state.sumWhole);
+  state.currentAge += 3;
+  addLog("🧬 癌症復發提款", formatCurrency(state.sumWhole));
   updateUI();
-  addLog(state.currentAge, "🧬 癌症复发 (方案A: 100%提款)", `+${formatMoney(state.sumWhole)}`);
 }
 
-function triggerCancerCash() {
-  if(!state.isFirstClaimed) return alert("请先启动首次重疾！");
-  document.getElementById('btnCancerLump').disabled = true; 
-  
-  state.currentAge += 1; 
-  let monthlyCash = state.sumWhole * 0.05;
-  state.cancerMonths += 1;
-  state.totalClaimed += monthlyCash;
-  
-  updateUI();
-  addLog(state.currentAge, `💸 抗癌月薪发放 (第${state.cancerMonths}个月)`, `+${formatMoney(monthlyCash)}`, "持续现金流");
-  document.getElementById('insightText').innerHTML = "<b>TOT 解析：</b>方案 B“抗癌月薪”启动！最长100个月，每月固定入账 5%，完美替代生病期间中断的收入！";
-}
-
-function triggerHeartStroke() {
-  if(!state.isFirstClaimed) return alert("请先启动首次重疾！");
-  if(state.heartStrokeCount >= 3) return alert("心脑血管理赔已达3次最高上限！");
-  
-  state.currentAge += 1; 
-  state.heartStrokeCount += 1;
-  state.totalClaimed += state.sumWhole;
-  
-  document.getElementById('heartStrokeCountTxt').innerText = `(${state.heartStrokeCount}/3次)`;
-  if(state.heartStrokeCount >= 3) {
-    document.getElementById('btnHeartStroke').disabled = true;
-  }
-  
-  updateUI();
-  addLog(state.currentAge, `❤️ 心脏病/中风理赔 (第${state.heartStrokeCount}次)`, `+${formatMoney(state.sumWhole)}`);
-}
-
-function triggerDementia() {
-  if(!state.isFirstClaimed) return alert("请先启动首次重疾！");
-  state.currentAge += 1;
-  let annuityAmt = state.sumWhole * 0.06;
-  state.totalClaimed += annuityAmt;
-  updateUI();
-  addLog(state.currentAge, "🧠 脑退化/帕金森 终身护理金", `+${formatMoney(annuityAmt)}`, "养老防线");
-  document.getElementById('insightText').innerHTML = "<b>TOT 解析：</b>脑退化年金启动！每年发放 6% 作为专属护理费，活多久领多久，给晚年最体面的尊严。";
-}
-
-function triggerChildGrowth(type) {
-  state.currentAge += 1;
-  let claimAmt = state.sumWhole * 0.20; 
-  state.totalClaimed += claimAmt;
-  let diseaseName = type === 'adhd' ? "专注力不足(ADHD)" : "妥瑞症";
-  updateUI();
-  addLog(state.currentAge, `🧸 儿童成长保障: ${diseaseName}`, `+${formatMoney(claimAmt)}`);
-}
-
-function triggerWaiver(who) {
-  if(state.waiverActive) return;
+function triggerWaiver(type) {
   state.waiverActive = true;
-  state.currentAge += 1;
-  
-  document.getElementById('dispPayStatus').innerText = "保费全免 (豁免)";
-  document.getElementById('waiverStatusBar').classList.add('waiver-active');
-  
-  let text = who === 'spouse' ? "配偶身故豁免" : "父母身故双豁免";
-  addLog(state.currentAge, `⚠️ 触发 ${text}`, "未来保费 ¥/$ 0", "定海神针");
-  
-  let insight = who === 'spouse' 
-    ? "<b>TOT 解析：</b>配偶豁免生效！留爱不留债，生存的一方无需再为保费发愁。"
-    : "<b>TOT 解析：</b>父母双豁免生效！真正的双保险，无论爸爸还是妈妈发生意外，都不会让孩子的保护伞断供。";
-  document.getElementById('insightText').innerHTML = insight;
+  document.getElementById('dispPayStatus').innerText = "保费豁免";
+  document.getElementById('waiverStatusBar').style.border = "2px solid #27ae60";
+  addLog("⚠️ 觸發豁免", "未來保費 $0");
 }
 
-// 核心更新：加入 5 秒闪烁动画重绘机制
+function addLog(evt, amt) {
+  const li = document.createElement('li');
+  li.innerHTML = `<span>[${state.currentAge}岁] ${evt}</span> <strong>${amt}</strong>`;
+  document.getElementById('logList').prepend(li);
+}
+
 function updateUI() {
-  document.getElementById('dispAge').innerText = state.currentAge + " 岁";
-  
-  const claimEl = document.getElementById('dispTotalClaim');
-  claimEl.innerText = formatMoney(state.totalClaimed);
-  
-  // 移除动画类 -> 触发重绘 -> 添加动画类 (确保每次点击都会闪烁 5 秒)
-  claimEl.classList.remove('flash-text');
-  void claimEl.offsetWidth; // Trigger DOM reflow
-  claimEl.classList.add('flash-text');
+  document.getElementById('dispAge').innerText = state.currentAge;
+  document.getElementById('dispTotalClaim').innerText = formatCurrency(state.totalClaimed);
 }
 
-// --- 导航列与弹窗控制逻辑 ---
-function switchNav(nav) {
-  if(nav === 'sandbox') {
-    closeCancerModal();
-    closeThreeInOneModal();
+// --- 圖片縮放與彈窗 ---
+function zoomImg(src) {
+  const overlay = document.getElementById('zoomOverlay');
+  document.getElementById('zoomedImg').src = src;
+  overlay.style.display = 'flex';
+}
+
+function showModal(id) {
+  closeAllModals();
+  document.getElementById(id).style.display = 'flex';
+}
+
+function closeAllModals() {
+  document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none');
+}
+
+// --- 強制更新功能 ---
+function forceUpdateApp() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      for (let registration of registrations) {
+        registration.update();
+      }
+      alert("🚀 更新指令已發送！請關閉 App 並重新開啟以加載最新版本。");
+      location.reload(true);
+    });
+  } else {
+    location.reload(true);
   }
 }
-function showCancerModal() {
-  document.getElementById('threeInOneModal').style.display = 'none';
-  document.getElementById('cancerModal').style.display = 'flex';
-}
-function closeCancerModal() { document.getElementById('cancerModal').style.display = 'none'; }
 
-function showThreeInOneModal() {
-  document.getElementById('cancerModal').style.display = 'none';
-  document.getElementById('threeInOneModal').style.display = 'flex';
-}
-function closeThreeInOneModal() { document.getElementById('threeInOneModal').style.display = 'none'; }
-
-
-// --- 客户管理与私域分享逻辑 (CRM 核心) ---
-function getSavedClients() {
-  let clients = localStorage.getItem('tot_clients_list');
-  return clients ? JSON.parse(clients) : [];
+// --- CRM 檔案管理 ---
+function saveClientData() {
+  let name = document.getElementById('clientNameInput').value;
+  if(!name) return alert("請輸入客戶名");
+  let data = { name, age: state.startAge, sum: state.sumWhole, mode: state.mode };
+  let list = JSON.parse(localStorage.getItem('tot_clients') || "[]");
+  list.push(data);
+  localStorage.setItem('tot_clients', JSON.stringify(list));
+  updateClientDropdown();
+  alert("保存成功");
 }
 
 function updateClientDropdown() {
-  let clients = getSavedClients();
-  let select = document.getElementById('clientSelect');
-  select.innerHTML = '<option value="">-- 选择已保存客户 --</option>';
-  clients.forEach(c => {
+  let list = JSON.parse(localStorage.getItem('tot_clients') || "[]");
+  let sel = document.getElementById('clientSelect');
+  sel.innerHTML = '<option value="">-- 选择已保存客户 --</option>';
+  list.forEach((item, idx) => {
     let opt = document.createElement('option');
-    opt.value = c.name;
-    opt.text = c.name;
-    select.appendChild(opt);
+    opt.value = idx;
+    opt.text = item.name;
+    sel.appendChild(opt);
   });
-}
-
-function saveClientData() {
-  const name = document.getElementById('clientNameInput').value.trim();
-  if(!name) return alert("请输入客户/方案名！");
-  
-  const data = {
-    name: name,
-    age: document.getElementById('startAge').value,
-    sumWhole: state.sumWhole,
-    mode: state.mode,
-    currency: state.currency
-  };
-  
-  let clients = getSavedClients();
-  let idx = clients.findIndex(c => c.name === name);
-  if(idx >= 0) {
-    if(confirm(`客户档案【${name}】已存在，是否覆盖更新？`)) {
-      clients[idx] = data;
-    } else { return; }
-  } else {
-    clients.push(data);
-  }
-  
-  localStorage.setItem('tot_clients_list', JSON.stringify(clients));
-  updateClientDropdown();
-  document.getElementById('clientSelect').value = name;
-  alert(`✅ 方案【${name}】已成功保存在本地数据库！`);
-}
-
-function deleteClientData() {
-  let name = document.getElementById('clientSelect').value;
-  if(!name) return alert("请先从下拉菜单选择要删除的档案！");
-  if(confirm(`确定要彻底删除【${name}】的档案吗？`)) {
-    let clients = getSavedClients().filter(c => c.name !== name);
-    localStorage.setItem('tot_clients_list', JSON.stringify(clients));
-    updateClientDropdown();
-    document.getElementById('clientNameInput').value = "";
-    alert("🗑️ 删除成功！");
-  }
-}
-
-function loadSelectedClient() {
-  let name = document.getElementById('clientSelect').value;
-  if(!name) return;
-  
-  let client = getSavedClients().find(c => c.name === name);
-  if(client) {
-    document.getElementById('clientNameInput').value = client.name;
-    document.getElementById('startAge').value = client.age;
-    state.sumWhole = client.sumWhole;
-    
-    document.getElementById('currencySelect').value = client.currency || 'USD';
-    state.currency = client.currency || 'USD';
-    if (state.currency === 'CNY') {
-      document.getElementById('rateDisplay').style.display = 'block';
-    } else {
-      document.getElementById('rateDisplay').style.display = 'none';
-    }
-    let displayVal = state.sumWhole * (state.currency === 'CNY' ? state.exchangeRate : 1);
-    document.getElementById('sumWhole').value = Math.round(displayVal).toLocaleString('en-US');
-
-    setMode(client.mode || 'adult');
-    initDashboard();
-  }
-}
-
-function exportClientData() {
-  const data = localStorage.getItem('tot_clients_list');
-  if(!data || JSON.parse(data).length === 0) return alert("当前客户库为空，没有可以导出的数据！");
-  const blob = new Blob([data], {type: "application/json"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = "TOT_专属客户档案库.json";
-  a.click();
-}
-
-function importClientData(event) {
-  const file = event.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const newData = JSON.parse(e.target.result);
-      if(Array.isArray(newData)) {
-        if(confirm(`检测到 ${newData.length} 笔客户档案，是否覆盖当前本地数据库？`)) {
-          localStorage.setItem('tot_clients_list', JSON.stringify(newData));
-          updateClientDropdown();
-          alert("✅ 客户库导入成功！");
-        }
-      } else {
-        alert("❌ 文件格式不兼容！请使用正确的档案库文件。");
-      }
-    } catch(err) {
-      alert("❌ 文件读取失败或格式错误！");
-    }
-  };
-  reader.readAsText(file);
 }
 
 function generateShareQR() {
-  const name = document.getElementById('clientNameInput').value.trim() || "贵宾";
-  const params = new URLSearchParams();
-  params.append('shared', '1');
-  params.append('n', encodeURIComponent(name));
-  params.append('a', document.getElementById('startAge').value);
-  params.append('s', state.sumWhole);
-  params.append('m', state.mode);
-  params.append('c', state.currency);
-
-  const shareUrl = window.location.origin + window.location.pathname + "?" + params.toString();
-  
+  const shareUrl = window.location.href + "?shared=1&n=" + encodeURIComponent(document.getElementById('clientNameInput').value);
   const qrContainer = document.getElementById('qrcode-source');
   qrContainer.innerHTML = '';
-  
-  new QRCode(qrContainer, {
-    text: shareUrl,
-    width: 256,
-    height: 256,
-    colorDark : "#2c3e50",
-    colorLight : "#ffffff",
-    correctLevel : QRCode.CorrectLevel.H
-  });
-
+  new QRCode(qrContainer, { text: shareUrl, width: 200, height: 200 });
   setTimeout(() => {
     const canvas = qrContainer.querySelector('canvas');
-    if(canvas) {
-      document.getElementById('final-qr-img').src = canvas.toDataURL("image/png");
-    }
-  }, 200);
-
-  document.getElementById('shareQRModal').style.display = 'flex';
+    document.getElementById('final-qr-img').src = canvas.toDataURL("image/png");
+    showModal('shareQRModal');
+  }, 300);
 }
 
-function checkSharedMode() {
-  const params = new URLSearchParams(window.location.search);
-  if(params.get('shared') === '1') {
-    document.body.classList.add('shared-mode');
-    
-    const name = decodeURIComponent(params.get('n') || '贵宾');
-    const vipBanner = document.getElementById('vipBanner');
-    vipBanner.innerHTML = `🌟 尊贵的 ${name} 您好，您的专属顾问为您定制了以下防御矩阵`;
-    vipBanner.style.display = 'block';
-
-    document.getElementById('startAge').value = params.get('a') || 30;
-    state.sumWhole = parseFloat(params.get('s')) || 1000000;
-    
-    const curr = params.get('c') || 'USD';
-    document.getElementById('currencySelect').value = curr;
-    
-    const mode = params.get('m') || 'adult';
-    changeCurrency(); 
-    setMode(mode);
-    initDashboard();
-  } else {
-    updateClientDropdown();
-    setMode('adult');
-  }
-}
-
-// 默认启动
-window.onload = async () => {
-  await fetchExchangeRate();
-  checkSharedMode();
-}
+window.onload = () => {
+  fetchExchangeRate();
+  updateClientDropdown();
+};
