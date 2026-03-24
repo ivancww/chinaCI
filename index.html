@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>生活应急保险库 v2.11.1 (私域 CRM 互动版)</title>
+<title>生活应急保险库 v2.12 (私域 CRM 互动版)</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2c3e50">
@@ -15,6 +15,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="./logo-192.png?v=2">
 <link rel="icon" type="image/png" sizes="512x512" href="./logo-512.png?v=2">
 
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.11.6/viewer.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <style>
@@ -130,7 +131,10 @@
   
   .modal-text-block { background: #f9f9f9; border-left: 4px solid var(--gold); padding: 15px; margin-bottom: 15px; border-radius: 4px; font-size: 0.9rem; color: #444; line-height: 1.6; }
   .modal-text-block h4 { margin: 0 0 8px 0; color: #2c3e50; font-size: 1.05rem; }
-  .modal-img { width: 100%; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: block; }
+  
+  /* 更新樣式：為 modal 內的圖片加入手勢提示 cursor */
+  .modal-img { width: 100%; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: block; cursor: zoom-in; }
+  
   .btn-close-modal { background: #bdc3c7; color: #333; padding: 12px; width: 100%; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 1rem; }
 
   .qr-wrapper { text-align: center; background: #fff; padding: 20px; border-radius: 8px; }
@@ -146,8 +150,8 @@
   <div class="header">
     <h1>🛡️ 家庭生活应急保险库</h1>
     <div class="version-tag" id="appVersion">
-      v2.11 强更旗舰版<br>
-      <span style="font-size:0.65rem; color:#fdfbf7; font-weight:normal;">新增：离线应用自动更新机制</span>
+      v2.12 圖片自適應版<br>
+      <span style="font-size:0.65rem; color:#fdfbf7; font-weight:normal;">更新：彈窗圖解支援手勢縮放查看</span>
     </div>
   </div>
 
@@ -324,13 +328,13 @@
         <h4>🎯 方案A：大额速决型 (10X 多重危疾赔偿)</h4>
         当首次确诊癌症并获赔100%后，只要距离上次确诊过了 <strong>3年</strong>，不管是癌症复发、转移、持续还是新发，直接一次性再打款 <strong>100% 保额</strong>！大额报销简单粗暴，暴力兜底！
       </div>
-      <img src="https://i.postimg.cc/mDhxFT8W/癌症方案A.jpg" alt="癌症方案A" class="modal-img">
+      <img src="https://i.postimg.cc/mDhxFT8W/癌症方案A.jpg" alt="癌症方案A" class="modal-img" id="imgCancerA">
       
       <div class="modal-text-block" style="border-left-color: #3498db;">
         <h4>🎯 方案B：细水长流型 (专属抗癌月薪)</h4>
         首次确诊后无需等3年，只需短短 <strong>1年等候期</strong>！只要您还在积极治疗，保险公司每个月固定打款 <strong>5% 保额</strong>，最长连发 <strong>100个月</strong>！完美填补您养病期间的“收入真空”，保证家庭生活不降级！
       </div>
-      <img src="https://i.postimg.cc/ydWqS7v4/癌症方案B.jpg" alt="癌症方案B" class="modal-img">
+      <img src="https://i.postimg.cc/ydWqS7v4/癌症方案B.jpg" alt="癌症方案B" class="modal-img" id="imgCancerB">
       <button class="btn-close-modal" onclick="closeCancerModal()">关闭图解</button>
     </div>
   </div>
@@ -346,13 +350,13 @@
         <h4>【一笔钱，三种花法，绝不白交】</h4>
         共享基础保额，完美对应人生的三种可能：发生重疾，它就是 <strong>救命钱</strong>；一生平安，它就是免税的 <strong>传承金</strong>；想补充高品质养老，退保提取，它就是您的 <strong>提款机</strong>！
       </div>
-      <img src="https://i.postimg.cc/3RWMD3nH/重疾三合一.jpg" alt="重疾三合一" class="modal-img">
+      <img src="https://i.postimg.cc/3RWMD3nH/重疾三合一.jpg" alt="重疾三合一" class="modal-img" id="imgThreeInOne1">
       
       <div class="modal-text-block" style="border-left-color: #e74c3c;">
         <h4>【理赔后会怎样？防线进化！】</h4>
         当您“预支”了这笔钱去救急，基础保额会相应减少。<strong>但是！</strong>一旦理赔达到 100%（保额用完），不仅基本保费全免，保单将自动进化为一张纯粹的 <strong>“多次重疾防御网”</strong>，后续还能继续享有高达 <strong>1000% 保额</strong> 的多重危疾赔付！
       </div>
-      <img src="https://i.postimg.cc/RFqrnvXr/重疾賠完后.jpg" alt="重疾赔完后" class="modal-img">
+      <img src="https://i.postimg.cc/RFqrnvXr/重疾賠完后.jpg" alt="重疾赔完后" class="modal-img" id="imgThreeInOne2">
       <button class="btn-close-modal" onclick="closeThreeInOneModal()">关闭图解</button>
     </div>
   </div>
@@ -380,33 +384,14 @@
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js').then(registration => {
         console.log('SW registered: ', registration);
-        
-        // 监听后台是否拉取到新版本的 sw.js
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          newWorker.addEventListener('statechange', () => {
-            // 当新版本安装完成且准备接管时
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('发现新版本，准备强制更新...');
-            }
-          });
-        });
-      }).catch(error => {
-        console.log('SW registration failed: ', error);
-      });
-
-      // 当 Service Worker 成功夺取控制权（即跳过等待后），强制刷新客户端页面
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
-          window.location.reload();
-          refreshing = true;
-        }
+      }).catch(registrationError => {
+        console.log('SW registration failed: ', registrationError);
       });
     });
   }
 </script>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.11.6/viewer.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
