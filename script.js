@@ -1,4 +1,4 @@
-/* * 生活应急保险库 v2.10 - 核心逻辑 (私域 CRM 互动版) */
+/* * 生活应急保险库 v2.12 - 核心逻辑 (图片自适应版) */
 
 let state = {
   mode: 'adult',
@@ -15,7 +15,8 @@ let state = {
   exchangeRate: 1
 };
 
-// --- 0. 实时汇率获取 ---
+// ... (fetchExchangeRate, changeCurrency, formatMoneyInput, formatMoney, addLog 函數維持不變) ...
+
 async function fetchExchangeRate() {
   try {
     let res = await fetch('https://open.er-api.com/v6/latest/USD');
@@ -122,7 +123,8 @@ function initDashboard() {
   addLog(state.currentAge, "🛡️ 保单正式生效", `重疾险保额 ${formatMoney(state.sumWhole)}`);
 }
 
-// --- 业务理赔逻辑 ---
+// ... (所有 trigger 理賠邏輯函數維持不變) ...
+
 function triggerEarlyStage() {
   state.currentAge += 1;
   let rawAmt = state.sumWhole * 0.20;
@@ -241,7 +243,8 @@ function updateUI() {
   claimEl.classList.add('flash-text');
 }
 
-// --- 导航列与弹窗控制逻辑 ---
+// ... (switchNav, 彈窗控制, CRM 邏輯維持不變) ...
+
 function switchNav(nav) {
   if(nav === 'sandbox') {
     closeCancerModal();
@@ -405,7 +408,7 @@ function generateShareQR() {
   setTimeout(() => {
     const canvas = qrContainer.querySelector('canvas');
     if(canvas) {
-      document.getElementById('final-qr-img').src = canvas.toDataURL("image/png");
+      document.getElementById('final-qr-img').src = canvas.toToDataURL("image/png");
     }
   }, 200);
 
@@ -438,8 +441,39 @@ function checkSharedMode() {
   }
 }
 
+// ================= 新增：初始化圖片查看器函數 =================
+function initImageViewers() {
+  // 定義需要支援縮放的圖片 ID 陣列
+  const imgIds = ['imgCancerA', 'imgCancerB', 'imgThreeInOne1', 'imgThreeInOne2'];
+  
+  imgIds.forEach(id => {
+    const imgEl = document.getElementById(id);
+    if (imgEl) {
+      // 為每張圖片初始化 Viewer.js
+      // 配置：隱藏工具欄和標題，優化手機體驗
+      new Viewer(imgEl, {
+        toolbar: false,
+        title: false,
+        navbar: false,
+        tooltip: false,
+        movable: true,
+        zoomable: true,
+        rotatable: false,
+        scalable: false,
+        transition: true,
+        fullscreen: false,
+        keyboard: true
+      });
+    }
+  });
+}
+// ===========================================================
+
 // 默认启动
 window.onload = async () => {
   await fetchExchangeRate();
   checkSharedMode();
+  // ================= 更新：網頁下載完成後初始化圖片查看器 =================
+  initImageViewers();
+  // ===================================================================
 }
